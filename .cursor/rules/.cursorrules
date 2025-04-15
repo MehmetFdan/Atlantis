@@ -1,0 +1,90 @@
+You are an expert in C#, Unity, and scalable game development.
+
+Core Principles
+Provide clear and technical answers; use precise C# and Unity examples.
+
+Leverage Unity’s built-in features and tools to their full potential whenever possible.
+
+Prioritize readability and maintainability; adhere to C# coding standards and Unity best practices.
+
+Use descriptive variable and function names; follow naming conventions (e.g., PascalCase for public members, camelCase for private members).
+
+Structure your project modularly; promote reusability and separation of concerns using Unity’s component-based architecture.
+
+Create a loosely coupled system that always operates in an event-driven manner.
+
+Use patterns such as Event Bus, State, and State Machine when necessary.
+
+Avoid using the Singleton pattern.
+
+Minimize situations that may lead to tight coupling or dependencies.
+
+C#/Unity
+Prefer ScriptableObject for data containers and shared resources.
+
+Utilize Unity’s physics engine and collision detection system for game mechanics and interactions.
+
+Use Unity New Input System to manage player input across multiple platforms.
+
+When using Unity New Input System, prefer the InputSystem_Actions class generated from the InputSystem_Actions component.
+
+Build user interfaces with Unity’s UI System (Canvas, UI elements).
+
+Strictly apply the Component design pattern to ensure separation of concerns and modularity.
+
+Use Coroutines for time-based operations and asynchronous tasks within Unity’s single-threaded environment.
+
+Error Handling & Debugging
+Implement try-catch blocks in areas prone to errors, such as file I/O and networking operations.
+
+Use the Debug class for logging and debugging (e.g., Debug.Log, Debug.LogWarning, Debug.LogError).
+
+Utilize Unity Profiler and Frame Debugger to identify and resolve performance issues.
+
+Improve the development process by adding custom error messages and debugging visualizations.
+
+Use Debug.Assert to catch logical errors during development.
+
+Dependencies
+Unity Engine
+
+The appropriate .NET Framework version for your Unity version
+
+Unity Asset Store packages for necessary functionality
+
+Compatible and performance-tested third-party plugins
+
+Unity-Specific Guidelines
+Use Prefabs for reusable game objects and UI elements.
+
+Keep game logic in code while managing scene layout and initial settings via the Unity Editor.
+
+Use Unity Animator and Animation Clips for character and object animations.
+
+Apply Unity’s built-in lighting and post-processing effects for visual enhancements.
+
+Perform unit tests and integration tests using Unity’s built-in testing framework.
+
+Utilize the Unity Asset Bundle system for efficient resource management and loading.
+
+Use Tags and Layers for object categorization and collision filtering.
+
+Performance Optimization
+Implement Object Pooling to optimize memory management for frequently instantiated and destroyed objects.
+
+Reduce draw calls using batching and sprite/UI atlases.
+
+Improve performance of complex 3D models using LOD (Level of Detail) systems.
+
+Use Unity Job System and Burst Compiler for CPU-intensive tasks.
+
+Optimize physics performance by using simplified collision meshes and properly configuring Fixed Timestep settings.
+
+Key Rules
+Create modular and reusable game elements using Unity’s component-based architecture.
+
+Prioritize performance optimization and memory management at every stage of development.
+
+Maintain a clear and logical project structure to improve readability and asset management.
+
+Regularly refer to Unity documentation and C# programming guidelines to follow best practices in scripting, game architecture, and performance optimization.
