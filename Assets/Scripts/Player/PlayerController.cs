@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using Events;
+using Atlantis.Events;
 
 /// <summary>
 /// Oyuncu kontrolcüsü. Oyuncunun hareketlerini, durumlarını ve girdilerini yönetir.
@@ -318,7 +318,6 @@ public class PlayerController : MonoBehaviour
             eventBus.Subscribe<SprintInputEvent>(OnSprintInput);
             eventBus.Subscribe<CrouchInputEvent>(OnCrouchInput);
             eventBus.Subscribe<AttackInputEvent>(OnAttackInput);
-            // Sağ mouse tuşu için ayrı bir event dinleyici ekle
             eventBus.Subscribe<RightMouseInputEvent>(OnRightMouseInput);
         }
         else
@@ -334,7 +333,6 @@ public class PlayerController : MonoBehaviour
         // Subscribe to new events
         if (eventBus != null)
         {
-            // Yeni dash ve parry input event'lerini dinle
             eventBus.Subscribe<DashInputEvent>(OnDashInput);
             eventBus.Subscribe<ParryInputEvent>(OnParryInput);
         }
@@ -347,7 +345,6 @@ public class PlayerController : MonoBehaviour
         // Unsubscribe from new events
         if (eventBus != null)
         {
-            // Dash ve parry event'lerinden ayrıl
             eventBus.Unsubscribe<DashInputEvent>(OnDashInput);
             eventBus.Unsubscribe<ParryInputEvent>(OnParryInput);
         }
@@ -407,7 +404,6 @@ public class PlayerController : MonoBehaviour
             eventBus.Unsubscribe<SprintInputEvent>(OnSprintInput);
             eventBus.Unsubscribe<CrouchInputEvent>(OnCrouchInput);
             eventBus.Unsubscribe<AttackInputEvent>(OnAttackInput);
-            // Sağ mouse tuşu için unsubscribe ekle
             eventBus.Unsubscribe<RightMouseInputEvent>(OnRightMouseInput);
         }
     }
@@ -666,77 +662,53 @@ public class PlayerController : MonoBehaviour
             StartDash();
         }
     }
-    
-    /// <summary>
-    /// Parry input olayını işler
-    /// </summary>
-    /// <param name="eventData">Parry input verileri</param>
+
     private void OnParryInput(ParryInputEvent eventData)
     {
         isParryPressed = eventData.IsParryPressed;
     }
-    
-    /// <summary>
-    /// Dash başlatır
-    /// </summary>
+
     public void StartDash()
     {
-        // Dash için gerekli değişkenleri ayarla
         isDashing = true;
         dashTimer = 0f;
-        
-        // Dash yönünü ayarla (hareket yönü veya karakter ileri yönü)
+
         if (isMovementPressed)
         {
-            // Hareket girdisine göre dash yönünü belirle
             Vector3 movementDirection = new Vector3(currentMovementInput.x, 0f, currentMovementInput.y).normalized;
             dashDirection = transform.TransformDirection(movementDirection);
         }
         else
         {
-            // Hareket yoksa karakterin baktığı yöne dash at
             dashDirection = transform.forward;
         }
-        
-        // Dash efekti veya sesi için eventbus ile event gönder
+
         if (eventBus != null)
         {
-            DashEvent dashEvent = new DashEvent
-            {
-                DashDirection = dashDirection
-            };
+            DashEvent dashEvent = new DashEvent(dashDirection);
             eventBus.Publish(dashEvent);
         }
-        
-        // Dash trail efekti aktifleştirilebilir
-        // TrailRenderer varsa aktif et
+
         TrailRenderer trailRenderer = GetComponentInChildren<TrailRenderer>();
         if (trailRenderer != null)
         {
             trailRenderer.emitting = true;
         }
     }
-    
-    /// <summary>
-    /// Dash'i bitirir
-    /// </summary>
+
     public void EndDash()
     {
-        // Dash durumunu kapat
         isDashing = false;
         dashTimer = 0f;
         
-        // Dash cooldown'ı ayarla
         dashCooldownTimer = DashCooldown;
-        
-        // Dash bittiğinde trail efekti kapat
+
         TrailRenderer trailRenderer = GetComponentInChildren<TrailRenderer>();
         if (trailRenderer != null)
         {
             trailRenderer.emitting = false;
         }
         
-        // Dash bittiğini bildir
         if (eventBus != null)
         {
             DashEndEvent dashEndEvent = new DashEndEvent();
@@ -744,22 +716,17 @@ public class PlayerController : MonoBehaviour
         }
     }
     
-    /// <summary>
-    /// Dash hareketini uygular
-    /// </summary>
     public void ApplyDashMovement()
     {
         if (isDashing)
         {
-            // Dash hareket yönünü güncelle (yön değişimi izinliyse)
             if (CanChangeDirectionWhileDashing && isMovementPressed)
             {
                 Vector3 movementDirection = new Vector3(currentMovementInput.x, 0f, currentMovementInput.y).normalized;
                 dashDirection = transform.TransformDirection(movementDirection);
             }
             
-            // Dash hareketini uygula
-            characterController.Move(dashDirection * DashSpeed * Time.deltaTime);
+            characterController.Move(DashSpeed * Time.deltaTime * dashDirection);
         }
     }
 } 

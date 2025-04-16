@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using Events;
+using Atlantis.Events;
 
 /// <summary>
 /// Düşman oluşturucu (spawner) sınıfı

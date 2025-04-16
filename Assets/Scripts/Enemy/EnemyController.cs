@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
-using Events;
+using Atlantis.Events;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -35,6 +35,15 @@ public class EnemyController : MonoBehaviour
     [Tooltip("Saklanma noktaları (yoksa rastgele bulunur)")]
     [SerializeField] private Transform[] coverPoints;
     
+    [Header("Ayarlar")]
+    [SerializeField] private EnemyWeapon primaryWeapon;
+    [SerializeField] private EnemyWeapon secondaryWeapon;
+    [SerializeField] private Transform weaponSocket;
+    [SerializeField] private GameObject currentWeaponInstance;
+
+    [Header("Hedef")]
+    [SerializeField] private Transform target;
+    
     // References
     private NavMeshAgent navMeshAgent;
     private Animator animator;
@@ -64,6 +73,19 @@ public class EnemyController : MonoBehaviour
     private float lastHeardSoundTime;
     private Vector3 lastHeardSoundPosition;
     private float soundIntensity;
+    
+    // Durum değişkenleri
+    private float lastAttackTime;
+    private bool isAttacking;
+    private bool isDead;
+    
+    // Sınıf özellikleri
+    private Dictionary<EnemyClass, System.Action> classSpecialAbilities;
+    private float specialAbilityCooldown = 15f;
+    private float lastSpecialAbilityTime;
+    
+    // Referanslar
+    private EnemyWeapon activeWeapon;
     
     // Properties
     /// <summary>
@@ -150,6 +172,9 @@ public class EnemyController : MonoBehaviour
         stateFactory = new EnemyStateFactory(this);
         stateMachine = new EnemyStateMachine(this, stateFactory);
         
+        // Sınıf özel yeteneklerini tanımla
+        InitializeClassSpecialAbilities();
+        
         // Sağlık değerini ayarla
         if (enemySettings != null)
         {
@@ -177,6 +202,12 @@ public class EnemyController : MonoBehaviour
     {
         // Durum makinesini başlat
         stateMachine.Initialize();
+        
+        // Düşman özelliklerini uygula
+        ApplyEnemySettings();
+        
+        // Başlangıç silahını oluştur
+        EquipWeapon(primaryWeapon);
     }
     
     private void Update()
@@ -200,6 +231,17 @@ public class EnemyController : MonoBehaviour
         {
             UpdateAlliesInRange();
         }
+        
+        if (isDead || target == null) return;
+        
+        // Hedefe doğru hareket et
+        MoveToTarget();
+        
+        // Saldırı kontrol et
+        CheckAttackCondition();
+        
+        // Özel yetenek kullanımını kontrol et
+        CheckSpecialAbilityUsage();
     }
     
     private void FixedUpdate()
@@ -332,7 +374,7 @@ public class EnemyController : MonoBehaviour
         // Ölüm kontrolü
         if (currentHealth <= 0)
         {
-            ChangeState<EnemyDeathState>();
+            Die();
         }
         // Sağlık belli bir değerin altına düştü ve kaçabiliyorsa
         else if (enemySettings.CanFlee && 
@@ -754,4 +796,658 @@ public class EnemyController : MonoBehaviour
         angleInDegrees += eulerY;
         return new Vector3(Mathf.Sin(angleInDegrees * Mathf.Deg2Rad), 0, Mathf.Cos(angleInDegrees * Mathf.Deg2Rad));
     }
+    
+    private void ApplyEnemySettings()
+    {
+        // NavMeshAgent ayarları
+        navMeshAgent.speed = enemySettings.MoveSpeed;
+        navMeshAgent.angularSpeed = enemySettings.RotationSpeed;
+        navMeshAgent.stoppingDistance = enemySettings.AttackRange * 0.8f;
+        
+        // Sağlık değeri
+        currentHealth = enemySettings.MaxHealth;
+    }
+    
+    private void MoveToTarget()
+    {
+        float distanceToTarget = Vector3.Distance(transform.position, target.position);
+        
+        if (distanceToTarget > activeWeapon.AttackRange)
+        {
+            navMeshAgent.isStopped = false;
+            navMeshAgent.SetDestination(target.position);
+            
+            // Koşma veya yürüme animasyonu
+            bool isChasing = distanceToTarget > enemySettings.DetectionRange * 0.8f;
+            navMeshAgent.speed = isChasing ? enemySettings.ChaseSpeed : enemySettings.MoveSpeed;
+            
+            if (animator != null)
+            {
+                animator.SetBool("IsMoving", true);
+                animator.SetBool("IsRunning", isChasing);
+            }
+        }
+        else
+        {
+            navMeshAgent.isStopped = true;
+            
+            if (animator != null)
+            {
+                animator.SetBool("IsMoving", false);
+                animator.SetBool("IsRunning", false);
+            }
+            
+            // Hedefe dön
+            Vector3 direction = (target.position - transform.position).normalized;
+            if (direction != Vector3.zero)
+            {
+                Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
+                transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * enemySettings.RotationSpeed);
+            }
+        }
+    }
+    
+    private void CheckAttackCondition()
+    {
+        if (isAttacking) return;
+        
+        float distanceToTarget = Vector3.Distance(transform.position, target.position);
+        
+        if (distanceToTarget <= activeWeapon.AttackRange && Time.time >= lastAttackTime + activeWeapon.AttackRate)
+        {
+            Attack();
+        }
+    }
+    
+    private void Attack()
+    {
+        isAttacking = true;
+        lastAttackTime = Time.time;
+        
+        // Animasyon ve ses efekti
+        if (animator != null)
+        {
+            string attackTrigger = activeWeapon.IsRanged ? "RangedAttack" : "MeleeAttack";
+            animator.SetTrigger(attackTrigger);
+        }
+        
+        if (activeWeapon.AttackSound != null)
+        {
+            AudioSource.PlayClipAtPoint(activeWeapon.AttackSound, transform.position);
+        }
+        
+        // Saldırı tipine göre hasar ver
+        if (activeWeapon.IsRanged)
+        {
+            StartCoroutine(FireProjectile());
+        }
+        else
+        {
+            StartCoroutine(MeleeAttack());
+        }
+    }
+    
+    private IEnumerator MeleeAttack()
+    {
+        // Animasyon süresi için bekleme (yaklaşık 0.5 saniye)
+        yield return new WaitForSeconds(0.5f);
+        
+        // Hedef menzil içinde mi kontrol et
+        float distanceToTarget = Vector3.Distance(transform.position, target.position);
+        if (distanceToTarget <= activeWeapon.AttackRange)
+        {
+            ApplyDamage(target.gameObject);
+            
+            // Vuruş efekti
+            if (activeWeapon.HitEffectPrefab != null)
+            {
+                Instantiate(activeWeapon.HitEffectPrefab, target.position, Quaternion.identity);
+            }
+            
+            // Vuruş sesi
+            if (activeWeapon.HitSound != null)
+            {
+                AudioSource.PlayClipAtPoint(activeWeapon.HitSound, target.position);
+            }
+        }
+        
+        // Saldırı tamamlandı
+        isAttacking = false;
+    }
+    
+    private IEnumerator FireProjectile()
+    {
+        // Animasyon süresi için bekleme (yaklaşık 0.3 saniye)
+        yield return new WaitForSeconds(0.3f);
+        
+        if (activeWeapon.ProjectilePrefab != null)
+        {
+            // Mermi oluştur
+            GameObject projectile = Instantiate(
+                activeWeapon.ProjectilePrefab, 
+                weaponSocket.position, 
+                Quaternion.LookRotation(target.position - weaponSocket.position)
+            );
+            
+            // Mermi bileşenini ayarla ve fırlat
+            EnemyProjectile projectileComponent = projectile.GetComponent<EnemyProjectile>();
+            if (projectileComponent == null)
+            {
+                projectileComponent = projectile.AddComponent<EnemyProjectile>();
+            }
+            
+            projectileComponent.Initialize(
+                activeWeapon.Damage, 
+                activeWeapon.ProjectileSpeed, 
+                activeWeapon.ProjectileLifetime,
+                activeWeapon.AppliesStatusEffect,
+                activeWeapon.StatusEffectType,
+                activeWeapon.StatusEffectDamage,
+                activeWeapon.StatusEffectDuration
+            );
+            
+            // Mermi yönünü ayarla
+            Rigidbody projectileRigidbody = projectile.GetComponent<Rigidbody>();
+            if (projectileRigidbody != null)
+            {
+                Vector3 direction = (target.position - weaponSocket.position).normalized;
+                projectileRigidbody.linearVelocity = direction * activeWeapon.ProjectileSpeed;
+            }
+        }
+        
+        // Saldırı tamamlandı
+        isAttacking = false;
+    }
+    
+    private void ApplyDamage(GameObject targetObj)
+    {
+        // Hedefin sağlık bileşenini bul (örnek)
+        // IDamageable damageable = targetObj.GetComponent<IDamageable>();
+        // if (damageable != null)
+        // {
+        //     float damage = activeWeapon.CalculateDamage();
+        //     damageable.TakeDamage(damage);
+        //     
+        //     // Özel durum etkisi uygula
+        //     if (activeWeapon.AppliesStatusEffect)
+        //     {
+        //         damageable.ApplyStatusEffect(
+        //             activeWeapon.StatusEffectType,
+        //             activeWeapon.StatusEffectDamage,
+        //             activeWeapon.StatusEffectDuration
+        //         );
+        //     }
+        // }
+        
+        // Şimdilik sadece log
+        float damage = activeWeapon.CalculateDamage();
+        Debug.Log($"{gameObject.name} dealt {damage} damage to {targetObj.name}");
+    }
+    
+    public void EquipWeapon(EnemyWeapon weapon)
+    {
+        if (weapon == null) return;
+        
+        // Eğer bu silah tipi düşmanın kullanabileceği silahlar arasında değilse iptal et
+        if (!enemySettings.CanUseWeapon(weapon.WeaponType))
+        {
+            Debug.LogWarning($"{gameObject.name} cannot equip {weapon.WeaponName} (incompatible weapon type)");
+            return;
+        }
+        
+        // Mevcut silahı yok et
+        if (currentWeaponInstance != null)
+        {
+            Destroy(currentWeaponInstance);
+        }
+        
+        // Yeni silahı aktifsleştir
+        activeWeapon = weapon;
+        
+        // Silah modelini oluştur
+        if (weapon.WeaponPrefab != null && weaponSocket != null)
+        {
+            currentWeaponInstance = Instantiate(weapon.WeaponPrefab, weaponSocket);
+            currentWeaponInstance.transform.localPosition = Vector3.zero;
+            currentWeaponInstance.transform.localRotation = Quaternion.identity;
+        }
+    }
+    
+    public void SwitchWeapon()
+    {
+        if (activeWeapon == primaryWeapon)
+        {
+            EquipWeapon(secondaryWeapon);
+        }
+        else
+        {
+            EquipWeapon(primaryWeapon);
+        }
+    }
+    
+    public void TakeDamage(float amount)
+    {
+        if (isDead) return;
+        
+        currentHealth -= amount;
+        
+        // Kaçma kontrolü
+        if (enemySettings.CanFlee && currentHealth / enemySettings.MaxHealth <= enemySettings.FleeHealthPercentage)
+        {
+            Flee();
+        }
+        
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+    
+    private void Die()
+    {
+        isDead = true;
+        navMeshAgent.isStopped = true;
+        
+        if (animator != null)
+        {
+            animator.SetTrigger("Die");
+        }
+        
+        // Collider'ı devre dışı bırak
+        Collider enemyCollider = GetComponent<Collider>();
+        if (enemyCollider != null)
+        {
+            enemyCollider.enabled = false;
+        }
+        
+        // Belirli bir süre sonra yok et
+        Destroy(gameObject, 5f);
+    }
+    
+    private void Flee()
+    {
+        // Kaçma mantığı
+        if (target != null)
+        {
+            Vector3 directionFromTarget = (transform.position - target.position).normalized;
+            Vector3 fleePosition = transform.position + directionFromTarget * 20f;
+            
+            NavMeshHit hit;
+            if (NavMesh.SamplePosition(fleePosition, out hit, 20f, NavMesh.AllAreas))
+            {
+                navMeshAgent.SetDestination(hit.position);
+                navMeshAgent.speed = enemySettings.ChaseSpeed * 1.5f; // Kaçış hızı
+            }
+        }
+    }
+    
+    // Sınıf özel yeteneklerini başlat
+    private void InitializeClassSpecialAbilities()
+    {
+        classSpecialAbilities = new Dictionary<EnemyClass, System.Action>
+        {
+            { EnemyClass.Savaşçı, WarriorSpecialAbility },
+            { EnemyClass.Okçu, ArcherSpecialAbility },
+            { EnemyClass.Büyücü, MageSpecialAbility },
+            { EnemyClass.Haydut, RogueSpecialAbility },
+            { EnemyClass.Muhafız, GuardSpecialAbility },
+            { EnemyClass.Avcı, HunterSpecialAbility },
+            { EnemyClass.Yağmacı, MarauderSpecialAbility },
+            { EnemyClass.Canavarlar, BeastSpecialAbility }
+        };
+    }
+    
+    // Özel yetenek kullanımını kontrol et
+    private void CheckSpecialAbilityUsage()
+    {
+        if (Time.time >= lastSpecialAbilityTime + specialAbilityCooldown)
+        {
+            // Hedef menzil içinde ve sağlık düşükse özel yetenek kullan
+            float healthPercentage = currentHealth / enemySettings.MaxHealth;
+            float distanceToTarget = Vector3.Distance(transform.position, target.position);
+            
+            if (distanceToTarget <= enemySettings.DetectionRange && 
+                (healthPercentage < 0.5f || Random.value < 0.2f))
+            {
+                UseSpecialAbility();
+            }
+        }
+    }
+    
+    // Özel yetenek kullan
+    private void UseSpecialAbility()
+    {
+        if (classSpecialAbilities.ContainsKey(enemySettings.EnemyClass))
+        {
+            classSpecialAbilities[enemySettings.EnemyClass].Invoke();
+            lastSpecialAbilityTime = Time.time;
+        }
+    }
+    
+    #region Sınıf Özel Yetenekleri
+    
+    // Savaşçı: Güçlü darbe
+    private void WarriorSpecialAbility()
+    {
+        StartCoroutine(PowerStrike());
+    }
+    
+    private IEnumerator PowerStrike()
+    {
+        Debug.Log($"{gameObject.name} kullanıyor: Güçlü Darbe!");
+        
+        if (animator != null)
+        {
+            animator.SetTrigger("SpecialAttack");
+        }
+        
+        yield return new WaitForSeconds(0.7f);
+        
+        float distanceToTarget = Vector3.Distance(transform.position, target.position);
+        if (distanceToTarget <= activeWeapon.AttackRange * 1.5f)
+        {
+            float powerDamage = activeWeapon.Damage * 2.5f;
+            // IDamageable damageable = target.GetComponent<IDamageable>();
+            // if (damageable != null)
+            // {
+            //    damageable.TakeDamage(powerDamage);
+            // }
+            
+            Debug.Log($"{gameObject.name} dealt {powerDamage} special attack damage to {target.name}");
+            
+            // Vuruş efekti (daha büyük)
+            if (activeWeapon.HitEffectPrefab != null)
+            {
+                GameObject effect = Instantiate(activeWeapon.HitEffectPrefab, target.position, Quaternion.identity);
+                effect.transform.localScale *= 2f;
+            }
+        }
+    }
+    
+    // Okçu: Hızlı atış
+    private void ArcherSpecialAbility()
+    {
+        StartCoroutine(RapidShot());
+    }
+    
+    private IEnumerator RapidShot()
+    {
+        Debug.Log($"{gameObject.name} kullanıyor: Hızlı Atış!");
+        
+        int shotCount = 3;
+        
+        for (int i = 0; i < shotCount; i++)
+        {
+            if (animator != null)
+            {
+                animator.SetTrigger("RangedAttack");
+            }
+            
+            yield return new WaitForSeconds(0.2f);
+            
+            if (activeWeapon.IsRanged && activeWeapon.ProjectilePrefab != null)
+            {
+                GameObject projectile = Instantiate(
+                    activeWeapon.ProjectilePrefab, 
+                    weaponSocket.position, 
+                    Quaternion.LookRotation(target.position - weaponSocket.position)
+                );
+                
+                EnemyProjectile projectileComponent = projectile.GetComponent<EnemyProjectile>();
+                if (projectileComponent == null)
+                {
+                    projectileComponent = projectile.AddComponent<EnemyProjectile>();
+                }
+                
+                projectileComponent.Initialize(
+                    activeWeapon.Damage * 0.7f, 
+                    activeWeapon.ProjectileSpeed * 1.5f, 
+                    activeWeapon.ProjectileLifetime,
+                    activeWeapon.AppliesStatusEffect,
+                    activeWeapon.StatusEffectType,
+                    activeWeapon.StatusEffectDamage,
+                    activeWeapon.StatusEffectDuration
+                );
+                
+                Rigidbody projectileRigidbody = projectile.GetComponent<Rigidbody>();
+                if (projectileRigidbody != null)
+                {
+                    Vector3 direction = (target.position - weaponSocket.position).normalized;
+                    
+                    // Hafif yayılma ekle
+                    direction += new Vector3(
+                        Random.Range(-0.1f, 0.1f),
+                        Random.Range(-0.05f, 0.05f),
+                        Random.Range(-0.1f, 0.1f)
+                    );
+                    
+                    projectileRigidbody.linearVelocity = direction.normalized * activeWeapon.ProjectileSpeed * 1.5f;
+                }
+            }
+            
+            yield return new WaitForSeconds(0.2f);
+        }
+    }
+    
+    // Büyücü: Büyü patlaması
+    private void MageSpecialAbility()
+    {
+        StartCoroutine(MagicBurst());
+    }
+    
+    private IEnumerator MagicBurst()
+    {
+        Debug.Log($"{gameObject.name} kullanıyor: Büyü Patlaması!");
+        
+        if (animator != null)
+        {
+            animator.SetTrigger("CastSpell");
+        }
+        
+        yield return new WaitForSeconds(0.8f);
+        
+        // Çevrede patlama efekti oluştur
+        float burstRadius = 5f;
+        
+        // Patlama efekti
+        if (activeWeapon.HitEffectPrefab != null)
+        {
+            GameObject effect = Instantiate(activeWeapon.HitEffectPrefab, transform.position, Quaternion.identity);
+            effect.transform.localScale = Vector3.one * burstRadius * 0.5f;
+        }
+        
+        // Çevredeki herkese zarar ver
+        Collider[] colliders = Physics.OverlapSphere(transform.position, burstRadius);
+        foreach (Collider collider in colliders)
+        {
+            if (collider.gameObject.CompareTag("Player"))
+            {
+                float damage = activeWeapon.Damage * 1.8f;
+                
+                // IDamageable damageable = collider.GetComponent<IDamageable>();
+                // if (damageable != null)
+                // {
+                //     damageable.TakeDamage(damage);
+                // }
+                
+                Debug.Log($"{gameObject.name} dealt {damage} AoE magic damage to {collider.gameObject.name}");
+            }
+        }
+    }
+    
+    // Haydut: Gizlenme
+    private void RogueSpecialAbility()
+    {
+        StartCoroutine(StealthMode());
+    }
+    
+    private IEnumerator StealthMode()
+    {
+        Debug.Log($"{gameObject.name} kullanıyor: Gizlenme!");
+        
+        // Görünürlüğü azalt
+        Renderer[] renderers = GetComponentsInChildren<Renderer>();
+        foreach (Renderer renderer in renderers)
+        {
+            Material[] materials = renderer.materials;
+            for (int i = 0; i < materials.Length; i++)
+            {
+                Color originalColor = materials[i].color;
+                materials[i].color = new Color(originalColor.r, originalColor.g, originalColor.b, 0.3f);
+            }
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+        
+        // Hızı artır
+        float originalSpeed = navMeshAgent.speed;
+        navMeshAgent.speed *= 1.5f;
+        
+        // 5 saniye gizli kal
+        yield return new WaitForSeconds(5f);
+        
+        // Tekrar görünür ol
+        foreach (Renderer renderer in renderers)
+        {
+            Material[] materials = renderer.materials;
+            for (int i = 0; i < materials.Length; i++)
+            {
+                Color originalColor = materials[i].color;
+                materials[i].color = new Color(originalColor.r, originalColor.g, originalColor.b, 1f);
+            }
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+        }
+        
+        // Hızı normale döndür
+        navMeshAgent.speed = originalSpeed;
+    }
+    
+    // Muhafız: Defans duruşu
+    private void GuardSpecialAbility()
+    {
+        StartCoroutine(DefensiveStance());
+    }
+    
+    private IEnumerator DefensiveStance()
+    {
+        Debug.Log($"{gameObject.name} kullanıyor: Defans Duruşu!");
+        
+        if (animator != null)
+        {
+            animator.SetTrigger("DefensiveStance");
+        }
+        
+        // Hasar direncini artır (takip edilecek bir değişken olarak eklenebilir)
+        float defenseBonus = 0.5f; // %50 daha az hasar
+        
+        // 6 saniye süreyle defans duruşunda kal
+        yield return new WaitForSeconds(6f);
+        
+        // Defans bonusunu kaldır
+    }
+    
+    // Avcı: Tuzak kurma
+    private void HunterSpecialAbility()
+    {
+        StartCoroutine(PlaceTrap());
+    }
+    
+    private IEnumerator PlaceTrap()
+    {
+        Debug.Log($"{gameObject.name} kullanıyor: Tuzak Kurma!");
+        
+        if (animator != null)
+        {
+            animator.SetTrigger("PlaceTrap");
+        }
+        
+        yield return new WaitForSeconds(0.5f);
+        
+        // Burada bir tuzak prefabı yerleştirme kodu olabilir
+        // GameObject trap = Instantiate(trapPrefab, transform.position, Quaternion.identity);
+        
+        Debug.Log($"{gameObject.name} positioned a trap at {transform.position}");
+    }
+    
+    // Yağmacı: Çılgın saldırı
+    private void MarauderSpecialAbility()
+    {
+        StartCoroutine(BerserkAttack());
+    }
+    
+    private IEnumerator BerserkAttack()
+    {
+        Debug.Log($"{gameObject.name} kullanıyor: Çılgın Saldırı!");
+        
+        if (animator != null)
+        {
+            animator.SetTrigger("Berserk");
+        }
+        
+        // Hızı ve saldırı gücünü artır
+        float originalSpeed = navMeshAgent.speed;
+        navMeshAgent.speed *= 1.8f;
+        
+        // 5 saniye çılgın modda kal
+        float berserkDuration = 5f;
+        float startTime = Time.time;
+        
+        while (Time.time < startTime + berserkDuration)
+        {
+            // Daha hızlı ve daha güçlü saldırılar
+            float distanceToTarget = Vector3.Distance(transform.position, target.position);
+            
+            if (distanceToTarget <= activeWeapon.AttackRange && !isAttacking)
+            {
+                Attack();
+                yield return new WaitForSeconds(activeWeapon.AttackRate * 0.5f); // Daha hızlı saldırı
+            }
+            
+            yield return null;
+        }
+        
+        // Normal moda dön
+        navMeshAgent.speed = originalSpeed;
+    }
+    
+    // Canavar: Vahşi kükreyiş
+    private void BeastSpecialAbility()
+    {
+        StartCoroutine(WildRoar());
+    }
+    
+    private IEnumerator WildRoar()
+    {
+        Debug.Log($"{gameObject.name} kullanıyor: Vahşi Kükreyiş!");
+        
+        if (animator != null)
+        {
+            animator.SetTrigger("Roar");
+        }
+        
+        // Kükreyiş efekti/sesi
+        // AudioSource.PlayClipAtPoint(roarSound, transform.position, 1.0f);
+        
+        yield return new WaitForSeconds(0.5f);
+        
+        // Etraftaki düşmanları çağır
+        if (enemySettings.CanCallForHelp)
+        {
+            Collider[] colliders = Physics.OverlapSphere(transform.position, enemySettings.HelpCallRange);
+            
+            foreach (Collider collider in colliders)
+            {
+                EnemyController ally = collider.GetComponent<EnemyController>();
+                
+                if (ally != null && ally != this)
+                {
+                    // Müttefiki hedef almaya yönlendir
+                    ally.target = this.target;
+                    
+                    Debug.Log($"{gameObject.name} called {ally.gameObject.name} for help!");
+                }
+            }
+        }
+    }
+    
+    #endregion
 } 

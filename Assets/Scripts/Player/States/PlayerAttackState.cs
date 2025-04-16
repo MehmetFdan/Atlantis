@@ -1,5 +1,5 @@
 using UnityEngine;
-using Events;
+using Atlantis.Events;
 
 public class PlayerAttackState : PlayerBaseState
 {
@@ -42,10 +42,7 @@ public class PlayerAttackState : PlayerBaseState
         // Saldırı animasyonu için event gönder
         if (playerController.EventBus != null)
         {
-            PlayerAttackEvent attackEvent = new PlayerAttackEvent
-            {
-                ComboIndex = currentComboIndex
-            };
+            PlayerAttackEvent attackEvent = new PlayerAttackEvent(comboIndex: currentComboIndex);
             playerController.EventBus.Publish(attackEvent);
         }
         

@@ -1,11 +1,57 @@
 using UnityEngine;
+using System.Collections.Generic;
 
-/// <summary>
-/// Düşman özellikleri için temel ayarlar
-/// </summary>
-[CreateAssetMenu(fileName = "NewEnemySettings", menuName = "Game/Enemy Settings")]
+// Düşman karakter sınıfı enum
+public enum EnemyClass
+{
+    Savaşçı,
+    Okçu,
+    Büyücü,
+    Haydut,
+    Muhafız,
+    Avcı,
+    Yağmacı,
+    Canavarlar
+}
+
+// Silah tipi enum
+public enum WeaponType
+{
+    Kılıç,
+    Balta,
+    Topuz,
+    Mızrak,
+    Yay,
+    Arbalet,
+    Hançer,
+    Asa,
+    Tılsım,
+    Tabanca,
+    Tüfek,
+    Pençe,
+    Diş
+}
+
+[CreateAssetMenu(fileName = "NewEnemySettings", menuName = "Game/Enemy/Enemy Settings")]
 public class EnemySettings : ScriptableObject
 {
+    [Header("Karakter Sınıfı Ayarları")]
+    [Tooltip("Düşman karakter sınıfı")]
+    [SerializeField] private EnemyClass enemyClass = EnemyClass.Savaşçı;
+    
+    [Tooltip("Kullanabildiği silah tipleri")]
+    [SerializeField] private List<WeaponType> compatibleWeapons = new List<WeaponType>();
+    
+    [Tooltip("Birincil silah tipi")]
+    [SerializeField] private WeaponType primaryWeapon = WeaponType.Kılıç;
+    
+    [Tooltip("İkincil silah tipi")]
+    [SerializeField] private WeaponType secondaryWeapon = WeaponType.Hançer;
+    
+    [Tooltip("Sınıf beceri seviyesi")]
+    [Range(1, 10)]
+    [SerializeField] private int classSkillLevel = 1;
+    
     [Header("Hareket Ayarları")]
     [Tooltip("Normal takip hızı")]
     [SerializeField] private float moveSpeed = 3.5f;
@@ -102,6 +148,11 @@ public class EnemySettings : ScriptableObject
     [SerializeField] private float learningRate = 0.5f;
     
     // Getter properties
+    public EnemyClass EnemyClass => enemyClass;
+    public List<WeaponType> CompatibleWeapons => compatibleWeapons;
+    public WeaponType PrimaryWeapon => primaryWeapon;
+    public WeaponType SecondaryWeapon => secondaryWeapon;
+    public int ClassSkillLevel => classSkillLevel;
     public float MoveSpeed => moveSpeed;
     public float ChaseSpeed => chaseSpeed;
     public float RotationSpeed => rotationSpeed;
@@ -133,4 +184,9 @@ public class EnemySettings : ScriptableObject
     public bool CanCounterPlayerDash => canCounterPlayerDash;
     public bool CanLearnPlayerPatterns => canLearnPlayerPatterns;
     public float LearningRate => learningRate;
+    
+    public bool CanUseWeapon(WeaponType weaponType)
+    {
+        return compatibleWeapons.Contains(weaponType);
+    }
 } 

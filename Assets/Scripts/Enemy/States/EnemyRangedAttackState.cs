@@ -1,5 +1,5 @@
 using UnityEngine;
-using Events;
+using Atlantis.Events;
 
 /// <summary>
 /// Düşman menzil saldırısı durumu

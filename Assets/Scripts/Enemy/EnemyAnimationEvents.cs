@@ -1,5 +1,5 @@
 using UnityEngine;
-using Events;
+using Atlantis.Events;
 
 /// <summary>
 /// Düşman animasyon olayları. Animasyon içindeki belirli karelerde tetiklenecek metodlar.

@@ -1,5 +1,5 @@
 using UnityEngine;
-using Events;
+using Atlantis.Events;
 
 /// <summary>
 /// Animator'den gelen animasyon olaylarını dinler ve işler.

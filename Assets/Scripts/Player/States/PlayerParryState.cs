@@ -1,5 +1,5 @@
 using UnityEngine;
-using Events;
+using Atlantis.Events;
 
 /// <summary>
 /// Oyuncunun parry (savuşturma) durumunu yöneten sınıf
