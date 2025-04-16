@@ -43,6 +43,64 @@ public class EnemySettings : ScriptableObject
     [Tooltip("Maksimum sağlık")]
     [SerializeField] private float maxHealth = 100f;
     
+    [Header("Duyma Ayarları")]
+    [Tooltip("Ses algılama menzili")]
+    [SerializeField] private float hearingRange = 15f;
+    
+    [Tooltip("Adım sesi duyma menzili")]
+    [SerializeField] private float footstepHearingRange = 8f;
+    
+    [Tooltip("Silah sesi duyma menzili")]
+    [SerializeField] private float weaponHearingRange = 25f;
+    
+    [Header("Taktik Ayarları")]
+    [Tooltip("Düşman menzile dayalı saldırı kullanabilir mi?")]
+    [SerializeField] private bool canUseRangedAttack = false;
+    
+    [Tooltip("Menzil saldırısı mesafesi")]
+    [SerializeField] private float rangedAttackDistance = 15f;
+    
+    [Tooltip("Menzil saldırısı gücü")]
+    [SerializeField] private float rangedAttackPower = 8f;
+    
+    [Tooltip("Menzil saldırısı hızı")]
+    [SerializeField] private float rangedAttackRate = 3f;
+    
+    [Tooltip("Düşman çukur/uçurum gibi tehlikeleri fark edebilir mi?")]
+    [SerializeField] private bool canDetectHazards = true;
+    
+    [Tooltip("Düşman kaçıp saklanabilir mi?")]
+    [SerializeField] private bool canTakeCover = false;
+    
+    [Tooltip("Düşman sağlık değeri belli bir oranın altına düştüğünde kaçar mı?")]
+    [SerializeField] private bool canFlee = false;
+    
+    [Tooltip("Kaçış için gerekli minimum sağlık yüzdesi")]
+    [SerializeField] private float fleeHealthPercentage = 0.25f;
+    
+    [Header("Grup Davranışı Ayarları")]
+    [Tooltip("Düşman başkalarını yardıma çağırabilir mi?")]
+    [SerializeField] private bool canCallForHelp = true;
+    
+    [Tooltip("Yardım çağrısı menzili")]
+    [SerializeField] private float helpCallRange = 20f;
+    
+    [Tooltip("Düşman görüldüğünde diğer düşmanlarla koordine olabilir mi?")]
+    [SerializeField] private bool canCoordinateAttacks = false;
+    
+    [Header("Adaptif Davranış Ayarları")]
+    [Tooltip("Düşman davranışları oyuncu saldırılarına uyum sağlayabilir mi?")]
+    [SerializeField] private bool canAdaptToPlayerAttacks = false;
+    
+    [Tooltip("Düşman dash kullanan oyuncuya karşı önlem alabilir mi?")]
+    [SerializeField] private bool canCounterPlayerDash = false;
+    
+    [Tooltip("Düşman oyuncunun tekrarlanan saldırılarını öğrenebilir mi?")]
+    [SerializeField] private bool canLearnPlayerPatterns = false;
+    
+    [Tooltip("Öğrenme hızı (0-1 arası, 1 = en hızlı)")]
+    [SerializeField] private float learningRate = 0.5f;
+    
     // Getter properties
     public float MoveSpeed => moveSpeed;
     public float ChaseSpeed => chaseSpeed;
@@ -55,4 +113,24 @@ public class EnemySettings : ScriptableObject
     public float AttackRate => attackRate;
     public float TargetLostTime => targetLostTime;
     public float MaxHealth => maxHealth;
+    
+    // Yeni getter properties
+    public float HearingRange => hearingRange;
+    public float FootstepHearingRange => footstepHearingRange;
+    public float WeaponHearingRange => weaponHearingRange;
+    public bool CanUseRangedAttack => canUseRangedAttack;
+    public float RangedAttackDistance => rangedAttackDistance;
+    public float RangedAttackPower => rangedAttackPower;
+    public float RangedAttackRate => rangedAttackRate;
+    public bool CanDetectHazards => canDetectHazards;
+    public bool CanTakeCover => canTakeCover;
+    public bool CanFlee => canFlee;
+    public float FleeHealthPercentage => fleeHealthPercentage;
+    public bool CanCallForHelp => canCallForHelp;
+    public float HelpCallRange => helpCallRange;
+    public bool CanCoordinateAttacks => canCoordinateAttacks;
+    public bool CanAdaptToPlayerAttacks => canAdaptToPlayerAttacks;
+    public bool CanCounterPlayerDash => canCounterPlayerDash;
+    public bool CanLearnPlayerPatterns => canLearnPlayerPatterns;
+    public float LearningRate => learningRate;
 } 

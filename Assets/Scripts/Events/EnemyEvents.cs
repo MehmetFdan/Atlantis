@@ -89,4 +89,60 @@ namespace Events
             AttackPower = attackPower;
         }
     }
+    
+    /// <summary>
+    /// Düşman menzilli saldırı olayı
+    /// </summary>
+    public class EnemyRangedAttackEvent : IEvent
+    {
+        /// <summary>
+        /// Saldırı hedefi
+        /// </summary>
+        public Transform Target { get; private set; }
+        
+        /// <summary>
+        /// Saldırı gücü
+        /// </summary>
+        public float AttackPower { get; private set; }
+        
+        /// <summary>
+        /// Saldırı yönü
+        /// </summary>
+        public Vector3 Direction { get; private set; }
+        
+        public EnemyRangedAttackEvent(Transform target, float attackPower, Vector3 direction)
+        {
+            Target = target;
+            AttackPower = attackPower;
+            Direction = direction;
+        }
+    }
+    
+    /// <summary>
+    /// Düşman yardım çağırma olayı
+    /// </summary>
+    public class EnemyHelpCallEvent : IEvent
+    {
+        /// <summary>
+        /// Yardım çağıran düşman
+        /// </summary>
+        public GameObject Caller { get; private set; }
+        
+        /// <summary>
+        /// Yardım çağırma pozisyonu
+        /// </summary>
+        public Vector3 CallPosition { get; private set; }
+        
+        /// <summary>
+        /// Hedef oyuncu
+        /// </summary>
+        public Transform Target { get; private set; }
+        
+        public EnemyHelpCallEvent(GameObject caller, Vector3 callPosition, Transform target)
+        {
+            Caller = caller;
+            CallPosition = callPosition;
+            Target = target;
+        }
+    }
 } 

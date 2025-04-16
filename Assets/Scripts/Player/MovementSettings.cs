@@ -44,6 +44,23 @@ public class MovementSettings : ScriptableObject
     [Tooltip("Çömelme geçiş hızı")]
     [SerializeField] private float crouchTransitionSpeed = 8f;
     
+    [Header("Dash Ayarları")]
+    [Tooltip("Dash hızı")]
+    [SerializeField] private float dashSpeed = 15f;
+    
+    [Tooltip("Dash süresi (saniye)")]
+    [SerializeField] private float dashDuration = 0.2f;
+    
+    [Tooltip("Dash cooldown süresi (saniye)")]
+    [SerializeField] private float dashCooldown = 1.5f;
+    
+    [Tooltip("Dash ile yön değişimi yapılabilir mi?")]
+    [SerializeField] private bool canChangeDirectionWhileDashing = false;
+    
+    [Tooltip("Dash sırasında alınan hasar azaltma çarpanı (0-1)")]
+    [Range(0f, 1f)]
+    [SerializeField] private float dashDamageReduction = 0.5f;
+    
     [Header("Hız Sınırları")]
     [Tooltip("Maksimum düşme hızı")]
     [SerializeField] private float maximumFallSpeed = 30f;
@@ -102,6 +119,31 @@ public class MovementSettings : ScriptableObject
     /// Çömelme geçiş hızı
     /// </summary>
     public float CrouchTransitionSpeed => crouchTransitionSpeed;
+    
+    /// <summary>
+    /// Dash hızı
+    /// </summary>
+    public float DashSpeed => dashSpeed;
+    
+    /// <summary>
+    /// Dash süresi
+    /// </summary>
+    public float DashDuration => dashDuration;
+    
+    /// <summary>
+    /// Dash cooldown süresi
+    /// </summary>
+    public float DashCooldown => dashCooldown;
+    
+    /// <summary>
+    /// Dash ile yön değişimi yapılabilir mi?
+    /// </summary>
+    public bool CanChangeDirectionWhileDashing => canChangeDirectionWhileDashing;
+    
+    /// <summary>
+    /// Dash sırasında alınan hasar azaltma çarpanı
+    /// </summary>
+    public float DashDamageReduction => dashDamageReduction;
     
     /// <summary>
     /// Maksimum düşme hızı

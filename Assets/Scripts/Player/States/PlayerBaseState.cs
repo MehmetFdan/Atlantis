@@ -38,10 +38,25 @@ public abstract class PlayerBaseState : IState
     {
         // Override in derived classes to handle state transitions
         
+        // Dash durum geçişi - Dash durumuna öncelik ver
+        if (playerController.IsDashPressed && playerController.CanDash)
+        {
+            playerController.ChangeState<PlayerDashState>();
+            return;
+        }
+        
+        // Parry durum geçişi - Dash'ten sonra, saldırıdan önce
+        if (playerController.IsParryPressed)
+        {
+            playerController.ChangeState<PlayerParryState>();
+            return;
+        }
+        
         // Tüm durumlardan saldırı durumuna geçiş kontrolü
         if (playerController.IsAttackPressed)
         {
             playerController.ChangeState<PlayerAttackState>();
+            return;
         }
     }
     

@@ -43,6 +43,22 @@ public class CombatSettings : ScriptableObject
     [Range(0, 1)]
     [SerializeField] private float movementSpeedMultiplier = 0.7f;
     
+    [Header("Parry Ayarları")]
+    [Tooltip("Parry aktif pencere süresi (saniye)")]
+    [SerializeField] private float parryActiveWindow = 0.2f;
+    
+    [Tooltip("Parry toparlanma süresi (saniye)")]
+    [SerializeField] private float parryRecoveryTime = 0.5f;
+    
+    [Tooltip("Parry menzili")]
+    [SerializeField] private float parryRange = 1.5f;
+    
+    [Tooltip("Parry cooldown süresi (saniye)")]
+    [SerializeField] private float parryCooldown = 1.0f;
+    
+    [Tooltip("Parry sonrası counter attack hasar çarpanı")]
+    [SerializeField] private float parryCounterDamageMultiplier = 1.5f;
+    
     [Header("Özel Efektler")]
     [Tooltip("Darbe efekti")]
     [SerializeField] private GameObject hitEffectPrefab;
@@ -52,6 +68,15 @@ public class CombatSettings : ScriptableObject
     
     [Tooltip("Vuruş sesi")]
     [SerializeField] private AudioClip[] hitSounds;
+    
+    [Tooltip("Parry başlangıç sesi")]
+    [SerializeField] private AudioClip parrySound;
+    
+    [Tooltip("Başarılı parry sesi")]
+    [SerializeField] private AudioClip parrySuccessSound;
+    
+    [Tooltip("Parry efekti")]
+    [SerializeField] private GameObject parryEffectPrefab;
     
     [Header("Katman Ayarları")]
     [Tooltip("Hasar verilebilecek katmanlar")]
@@ -108,6 +133,31 @@ public class CombatSettings : ScriptableObject
     public float MovementSpeedMultiplier => movementSpeedMultiplier;
     
     /// <summary>
+    /// Parry aktif pencere süresi
+    /// </summary>
+    public float ParryActiveWindow => parryActiveWindow;
+    
+    /// <summary>
+    /// Parry toparlanma süresi
+    /// </summary>
+    public float ParryRecoveryTime => parryRecoveryTime;
+    
+    /// <summary>
+    /// Parry menzili
+    /// </summary>
+    public float ParryRange => parryRange;
+    
+    /// <summary>
+    /// Parry cooldown süresi
+    /// </summary>
+    public float ParryCooldown => parryCooldown;
+    
+    /// <summary>
+    /// Parry sonrası counter attack hasar çarpanı
+    /// </summary>
+    public float ParryCounterDamageMultiplier => parryCounterDamageMultiplier;
+    
+    /// <summary>
     /// Darbe efekti
     /// </summary>
     public GameObject HitEffectPrefab => hitEffectPrefab;
@@ -121,6 +171,21 @@ public class CombatSettings : ScriptableObject
     /// Vuruş sesleri
     /// </summary>
     public AudioClip[] HitSounds => hitSounds;
+    
+    /// <summary>
+    /// Parry başlangıç sesi
+    /// </summary>
+    public AudioClip ParrySound => parrySound;
+    
+    /// <summary>
+    /// Başarılı parry sesi
+    /// </summary>
+    public AudioClip ParrySuccessSound => parrySuccessSound;
+    
+    /// <summary>
+    /// Parry efekti
+    /// </summary>
+    public GameObject ParryEffectPrefab => parryEffectPrefab;
     
     /// <summary>
     /// Hasar verilebilecek katmanlar

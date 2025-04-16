@@ -5,7 +5,8 @@ using UnityEngine;
 /// </summary>
 public class EnemyChaseState : EnemyBaseState
 {
-    private float targetLostTimer;
+    private float targetLostTimer = 0f;
+    private Vector3 lastTargetPosition;
     
     public EnemyChaseState(EnemyController owner, EnemyStateFactory stateFactory) : base(owner, stateFactory)
     {
@@ -13,71 +14,148 @@ public class EnemyChaseState : EnemyBaseState
     
     public override void Enter()
     {
-        // NavMeshAgent'ı aktifleştir
-        owner.NavMeshAgent.isStopped = false;
+        Debug.Log("Enemy entered CHASE state");
+        targetLostTimer = 0f;
+        
+        // Koşma animasyonunu aktifleştir
+        owner.Animator?.SetBool("IsChasing", true);
         
         // Hızı ayarla
         owner.NavMeshAgent.speed = owner.EnemySettings.ChaseSpeed;
         
-        // Takip kaybı sayacını sıfırla
-        targetLostTimer = 0f;
-        
-        // Animasyonu ayarla
-        owner.Animator?.SetBool("IsChasing", true);
-        
-        // Hedefi belirle ve takibe başla
-        SetDestinationToTarget();
-    }
-    
-    public override void Update()
-    {
-        // Eğer hedef yoksa veya ölmüşse
-        if (owner.CurrentTarget == null)
+        // Son hedef pozisyonunu kaydet
+        if (owner.CurrentTarget != null)
         {
-            // Takip kaybı sayacını artır
-            targetLostTimer += Time.deltaTime;
-            
-            // Belirli bir süre geçtiyse boşta durumuna geç
-            if (targetLostTimer >= owner.EnemySettings.TargetLostTime)
-            {
-                ChangeState<EnemyIdleState>();
-                return;
-            }
+            lastTargetPosition = owner.CurrentTarget.position;
         }
-        else
+        else if (owner.LastKnownPlayerPosition != Vector3.zero)
         {
-            // Takip kaybı sayacını sıfırla
-            targetLostTimer = 0f;
-            
-            // Hedefin pozisyonunu güncelle
-            SetDestinationToTarget();
-            
-            // Hedefe olan mesafeyi kontrol et
-            float distanceToTarget = Vector3.Distance(owner.transform.position, owner.CurrentTarget.position);
-            
-            // Saldırı menzilinde mi kontrol et
-            if (distanceToTarget <= owner.EnemySettings.AttackRange)
-            {
-                ChangeState<EnemyAttackState>();
-                return;
-            }
+            lastTargetPosition = owner.LastKnownPlayerPosition;
         }
-        
-        // Tekrar hedef kontrolü yap
-        owner.CheckForTarget();
-    }
-    
-    private void SetDestinationToTarget()
-    {
-        if (owner.CurrentTarget != null && owner.NavMeshAgent.isActiveAndEnabled)
+        else if (owner.IsRespondingToHelpCall)
         {
-            owner.NavMeshAgent.SetDestination(owner.CurrentTarget.position);
+            lastTargetPosition = owner.HelpCallPosition;
         }
     }
     
     public override void Exit()
     {
-        // Animasyonu sıfırla
         owner.Animator?.SetBool("IsChasing", false);
+    }
+    
+    public override void Update()
+    {
+        // Hedefe doğru hareket et
+        if (owner.CurrentTarget != null)
+        {
+            // Hedefi takip et
+            owner.NavMeshAgent.SetDestination(owner.CurrentTarget.position);
+            lastTargetPosition = owner.CurrentTarget.position;
+            targetLostTimer = 0f;
+        }
+        else
+        {
+            // Hedef kayboldu, son bilinen pozisyona git
+            if (targetLostTimer == 0f && lastTargetPosition != Vector3.zero)
+            {
+                owner.NavMeshAgent.SetDestination(lastTargetPosition);
+            }
+            
+            targetLostTimer += Time.deltaTime;
+            
+            // Belirli bir süre sonra hedef bulunamazsa idle durumuna geç
+            if (targetLostTimer >= owner.EnemySettings.TargetLostTime)
+            {
+                // Eğer oyuncu ses çıkarıyorsa veya bir ipucu varsa, araştırma durumuna geç
+                if (Time.time - owner.LastHeardSoundTime < 3f)
+                {
+                    ChangeState<EnemyInvestigateState>();
+                }
+                else
+                {
+                    ChangeState<EnemyIdleState>();
+                }
+                return;
+            }
+        }
+        
+        // Hedefe olan mesafeyi kontrol et
+        if (owner.CurrentTarget != null)
+        {
+            float distanceToTarget = Vector3.Distance(owner.transform.position, owner.CurrentTarget.position);
+            
+            // Hedef menzilinde ise, saldırıya başla
+            if (distanceToTarget <= owner.EnemySettings.AttackRange)
+            {
+                // Yakın dövüş saldırısına geç
+                ChangeState<EnemyAttackState>();
+            }
+            // Hedef menzilli saldırı mesafesinde ve düşman menzilli saldırı yapabiliyorsa
+            else if (owner.EnemySettings.CanUseRangedAttack && 
+                     distanceToTarget <= owner.EnemySettings.RangedAttackDistance && 
+                     distanceToTarget > owner.EnemySettings.AttackRange * 1.5f)
+            {
+                // Menzilli saldırı mesafesindeyse, menzilli saldırıya geç
+                ChangeState<EnemyRangedAttackState>();
+            }
+        }
+        else
+        {
+            // Hedef pozisyonuna yaklaştık mı?
+            if (owner.NavMeshAgent.remainingDistance <= owner.NavMeshAgent.stoppingDistance)
+            {
+                // Hedef noktaya vardık ama hedef yok, araştırmaya geç
+                ChangeState<EnemyInvestigateState>();
+            }
+        }
+        
+        // Düşman zayıfladıysa ve kaçabiliyorsa, kaçmayı düşün
+        if (owner.EnemySettings.CanFlee && 
+            owner.CurrentHealth / owner.EnemySettings.MaxHealth <= owner.EnemySettings.FleeHealthPercentage)
+        {
+            // Yeterince zayıfladık, kaçma kontrolü yap
+            float fleeChance = 1f - (owner.CurrentHealth / owner.EnemySettings.MaxHealth);
+            if (Random.value < fleeChance * 0.5f)
+            {
+                ChangeState<EnemyFleeState>();
+            }
+        }
+    }
+    
+    public override void FixedUpdate()
+    {
+        // Düşman özel davranışları
+        if (owner.CurrentTarget != null)
+        {
+            // Eğer grup koordinasyonu aktif ve müttefikler varsa
+            if (owner.EnemySettings.CanCoordinateAttacks && owner.HasAlliesInRange)
+            {
+                // Yakın dövüş menzilindeki düşman sayısını sınırla - etrafta dolaş
+                RaycastHit[] hits = Physics.SphereCastAll(owner.CurrentTarget.position, 
+                                                         owner.EnemySettings.AttackRange, 
+                                                         Vector3.up, 0.1f);
+                
+                int nearbyEnemies = 0;
+                foreach (RaycastHit hit in hits)
+                {
+                    if (hit.collider.CompareTag("Enemy") && hit.collider.gameObject != owner.gameObject)
+                    {
+                        nearbyEnemies++;
+                    }
+                }
+                
+                // Etrafta çok düşman varsa, biraz uzakta dur ve çember oluştur
+                if (nearbyEnemies >= 3)
+                {
+                    // Hedefe yaklaşma, etrafında dön
+                    Vector3 dirToTarget = owner.CurrentTarget.position - owner.transform.position;
+                    Vector3 perpendicular = Vector3.Cross(dirToTarget.normalized, Vector3.up);
+                    Vector3 circlePoint = owner.CurrentTarget.position + perpendicular * owner.EnemySettings.AttackRange * 1.5f;
+                    
+                    // Çemberdeki noktaya git
+                    owner.NavMeshAgent.SetDestination(circlePoint);
+                }
+            }
+        }
     }
 } 

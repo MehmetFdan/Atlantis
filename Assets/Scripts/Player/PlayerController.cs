@@ -92,6 +92,12 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Saldırı tuşuna basılıp basılmadığı")]
     private bool isAttackPressed;
     
+    [Tooltip("Dash tuşuna basılıp basılmadığı")]
+    private bool isDashPressed;
+    
+    [Tooltip("Parry tuşuna basılıp basılmadığı")]
+    private bool isParryPressed;
+    
     // Ground check
     [Tooltip("Karakterin yerde olup olmadığı")]
     private bool isGrounded;
@@ -105,7 +111,20 @@ public class PlayerController : MonoBehaviour
     // Events
     [Tooltip("Input system eylemleri")]
     private InputSystem_Actions inputActions;
-
+    
+    // Dash variables
+    [Tooltip("Dash zamanı takibi")]
+    private float dashTimer = 0f;
+    
+    [Tooltip("Dash cooldown takibi")]
+    private float dashCooldownTimer = 0f;
+    
+    [Tooltip("Dash yönü")]
+    private Vector3 dashDirection;
+    
+    [Tooltip("Dash aktif mi?")]
+    private bool isDashing = false;
+    
     /// <summary>
     /// CharacterController bileşeninin referansı
     /// </summary>
@@ -165,6 +184,16 @@ public class PlayerController : MonoBehaviour
     /// Saldırı tuşuna basılıp basılmadığı
     /// </summary>
     public bool IsAttackPressed => isAttackPressed;
+    
+    /// <summary>
+    /// Dash tuşuna basılıp basılmadığı
+    /// </summary>
+    public bool IsDashPressed => isDashPressed;
+    
+    /// <summary>
+    /// Parry tuşuna basılıp basılmadığı
+    /// </summary>
+    public bool IsParryPressed => isParryPressed;
     
     /// <summary>
     /// Karakterin yerde olup olmadığı
@@ -227,6 +256,41 @@ public class PlayerController : MonoBehaviour
     public GameObject EquippedWeaponObject => equippedWeaponObject;
     
     /// <summary>
+    /// Dash aktif mi?
+    /// </summary>
+    public bool IsDashing => isDashing;
+    
+    /// <summary>
+    /// Dash cooldown bitmiş mi?
+    /// </summary>
+    public bool CanDash => dashCooldownTimer <= 0f;
+    
+    /// <summary>
+    /// Dash hızı
+    /// </summary>
+    public float DashSpeed => movementSettings != null ? movementSettings.DashSpeed : 15f;
+    
+    /// <summary>
+    /// Dash süresi
+    /// </summary>
+    public float DashDuration => movementSettings != null ? movementSettings.DashDuration : 0.2f;
+    
+    /// <summary>
+    /// Dash cooldown süresi
+    /// </summary>
+    public float DashCooldown => movementSettings != null ? movementSettings.DashCooldown : 1.5f;
+    
+    /// <summary>
+    /// Dash ile yön değişimi yapılabilir mi?
+    /// </summary>
+    public bool CanChangeDirectionWhileDashing => movementSettings != null ? movementSettings.CanChangeDirectionWhileDashing : false;
+    
+    /// <summary>
+    /// Dash sırasında alınan hasar azaltma çarpanı
+    /// </summary>
+    public float DashDamageReduction => movementSettings != null ? movementSettings.DashDamageReduction : 0.5f;
+    
+    /// <summary>
     /// Durum değişikliği için yardımcı metot
     /// </summary>
     /// <typeparam name="T">Geçiş yapılacak durum türü</typeparam>
@@ -266,11 +330,27 @@ public class PlayerController : MonoBehaviour
     private void OnEnable()
     {
         inputActions.Enable();
+        
+        // Subscribe to new events
+        if (eventBus != null)
+        {
+            // Yeni dash ve parry input event'lerini dinle
+            eventBus.Subscribe<DashInputEvent>(OnDashInput);
+            eventBus.Subscribe<ParryInputEvent>(OnParryInput);
+        }
     }
     
     private void OnDisable()
     {
         inputActions.Disable();
+        
+        // Unsubscribe from new events
+        if (eventBus != null)
+        {
+            // Dash ve parry event'lerinden ayrıl
+            eventBus.Unsubscribe<DashInputEvent>(OnDashInput);
+            eventBus.Unsubscribe<ParryInputEvent>(OnParryInput);
+        }
     }
     
     private void Start()
@@ -292,6 +372,24 @@ public class PlayerController : MonoBehaviour
         
         // Silah değiştirme kontrolleri
         HandleWeaponSwitching();
+        
+        // Dash cooldown güncelleme
+        if (dashCooldownTimer > 0f)
+        {
+            dashCooldownTimer -= Time.deltaTime;
+        }
+        
+        // Dash aktifse dash zamanını güncelle
+        if (isDashing)
+        {
+            dashTimer += Time.deltaTime;
+            
+            // Dash süresi bittiyse dash'i bitir
+            if (dashTimer >= DashDuration)
+            {
+                EndDash();
+            }
+        }
     }
     
     private void FixedUpdate()
@@ -508,6 +606,12 @@ public class PlayerController : MonoBehaviour
         float scrollWheel = Input.GetAxis("Mouse ScrollWheel");
         if (scrollWheel != 0)
         {
+            // Silah listesi boş veya null ise işlem yapma
+            if (availableWeapons == null || availableWeapons.Length == 0)
+            {
+                return;
+            }
+            
             // Aktif silahın indeksini bul
             int currentIndex = GetCurrentWeaponIndex();
             int newIndex;
@@ -546,5 +650,116 @@ public class PlayerController : MonoBehaviour
         }
         
         return -1;
+    }
+    
+    /// <summary>
+    /// Dash input olayını işler
+    /// </summary>
+    /// <param name="eventData">Dash input verileri</param>
+    private void OnDashInput(DashInputEvent eventData)
+    {
+        isDashPressed = eventData.IsDashPressed;
+        
+        // Dash basıldıysa ve cooldown bittiyse dash başlat
+        if (isDashPressed && CanDash && !isDashing)
+        {
+            StartDash();
+        }
+    }
+    
+    /// <summary>
+    /// Parry input olayını işler
+    /// </summary>
+    /// <param name="eventData">Parry input verileri</param>
+    private void OnParryInput(ParryInputEvent eventData)
+    {
+        isParryPressed = eventData.IsParryPressed;
+    }
+    
+    /// <summary>
+    /// Dash başlatır
+    /// </summary>
+    public void StartDash()
+    {
+        // Dash için gerekli değişkenleri ayarla
+        isDashing = true;
+        dashTimer = 0f;
+        
+        // Dash yönünü ayarla (hareket yönü veya karakter ileri yönü)
+        if (isMovementPressed)
+        {
+            // Hareket girdisine göre dash yönünü belirle
+            Vector3 movementDirection = new Vector3(currentMovementInput.x, 0f, currentMovementInput.y).normalized;
+            dashDirection = transform.TransformDirection(movementDirection);
+        }
+        else
+        {
+            // Hareket yoksa karakterin baktığı yöne dash at
+            dashDirection = transform.forward;
+        }
+        
+        // Dash efekti veya sesi için eventbus ile event gönder
+        if (eventBus != null)
+        {
+            DashEvent dashEvent = new DashEvent
+            {
+                DashDirection = dashDirection
+            };
+            eventBus.Publish(dashEvent);
+        }
+        
+        // Dash trail efekti aktifleştirilebilir
+        // TrailRenderer varsa aktif et
+        TrailRenderer trailRenderer = GetComponentInChildren<TrailRenderer>();
+        if (trailRenderer != null)
+        {
+            trailRenderer.emitting = true;
+        }
+    }
+    
+    /// <summary>
+    /// Dash'i bitirir
+    /// </summary>
+    public void EndDash()
+    {
+        // Dash durumunu kapat
+        isDashing = false;
+        dashTimer = 0f;
+        
+        // Dash cooldown'ı ayarla
+        dashCooldownTimer = DashCooldown;
+        
+        // Dash bittiğinde trail efekti kapat
+        TrailRenderer trailRenderer = GetComponentInChildren<TrailRenderer>();
+        if (trailRenderer != null)
+        {
+            trailRenderer.emitting = false;
+        }
+        
+        // Dash bittiğini bildir
+        if (eventBus != null)
+        {
+            DashEndEvent dashEndEvent = new DashEndEvent();
+            eventBus.Publish(dashEndEvent);
+        }
+    }
+    
+    /// <summary>
+    /// Dash hareketini uygular
+    /// </summary>
+    public void ApplyDashMovement()
+    {
+        if (isDashing)
+        {
+            // Dash hareket yönünü güncelle (yön değişimi izinliyse)
+            if (CanChangeDirectionWhileDashing && isMovementPressed)
+            {
+                Vector3 movementDirection = new Vector3(currentMovementInput.x, 0f, currentMovementInput.y).normalized;
+                dashDirection = transform.TransformDirection(movementDirection);
+            }
+            
+            // Dash hareketini uygula
+            characterController.Move(dashDirection * DashSpeed * Time.deltaTime);
+        }
     }
 } 

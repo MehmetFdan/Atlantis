@@ -116,6 +116,34 @@ namespace Events
             }
         }
         
+        public void OnDash(InputAction.CallbackContext context)
+        {
+            if (context.started)
+            {
+                if (debugInput) Debug.Log("Dash tuşu basıldı");
+                eventBus.Publish(new DashInputEvent(true));
+            }
+            else if (context.canceled)
+            {
+                if (debugInput) Debug.Log("Dash tuşu bırakıldı");
+                eventBus.Publish(new DashInputEvent(false));
+            }
+        }
+        
+        public void OnParry(InputAction.CallbackContext context)
+        {
+            if (context.started)
+            {
+                if (debugInput) Debug.Log("Parry tuşu basıldı");
+                eventBus.Publish(new ParryInputEvent(true));
+            }
+            else if (context.canceled)
+            {
+                if (debugInput) Debug.Log("Parry tuşu bırakıldı");
+                eventBus.Publish(new ParryInputEvent(false));
+            }
+        }
+        
         // Sağ mouse tuşu için UI.RightClick olayını dinle
         public void OnRightClick(InputAction.CallbackContext context)
         {

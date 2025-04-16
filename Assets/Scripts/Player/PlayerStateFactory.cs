@@ -43,4 +43,14 @@ public class PlayerStateFactory
     {
         return new PlayerAttackState(playerController);
     }
+    
+    public PlayerDashState Dash()
+    {
+        return new PlayerDashState(playerController);
+    }
+    
+    public PlayerParryState Parry()
+    {
+        return new PlayerParryState(playerController);
+    }
 } 
