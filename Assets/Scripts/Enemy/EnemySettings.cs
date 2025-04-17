@@ -89,6 +89,10 @@ public class EnemySettings : ScriptableObject
     [Tooltip("Maksimum sağlık")]
     [SerializeField] private float maxHealth = 100f;
     
+    [Tooltip("Hasar azaltma oranı (0-1 arası)")]
+    [Range(0, 1)]
+    [SerializeField] private float damageReduction = 0f;
+    
     [Header("Duyma Ayarları")]
     [Tooltip("Ses algılama menzili")]
     [SerializeField] private float hearingRange = 15f;
@@ -164,6 +168,7 @@ public class EnemySettings : ScriptableObject
     public float AttackRate => attackRate;
     public float TargetLostTime => targetLostTime;
     public float MaxHealth => maxHealth;
+    public float DamageReduction { get => damageReduction; set => damageReduction = value; }
     
     // Yeni getter properties
     public float HearingRange => hearingRange;

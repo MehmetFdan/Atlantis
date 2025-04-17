@@ -179,6 +179,7 @@ public class EnemyController : MonoBehaviour
         if (enemySettings != null)
         {
             currentHealth = enemySettings.MaxHealth;
+            enemySettings.DamageReduction = 0f; // Başlangıçta hasar azaltma yok
         }
         else
         {
@@ -1029,7 +1030,9 @@ public class EnemyController : MonoBehaviour
     {
         if (isDead) return;
         
-        currentHealth -= amount;
+        // Hasar azaltma uygula
+        float reducedDamage = amount * (1f - enemySettings.DamageReduction);
+        currentHealth -= reducedDamage;
         
         // Kaçma kontrolü
         if (enemySettings.CanFlee && currentHealth / enemySettings.MaxHealth <= enemySettings.FleeHealthPercentage)
@@ -1336,13 +1339,15 @@ public class EnemyController : MonoBehaviour
             animator.SetTrigger("DefensiveStance");
         }
         
-        // Hasar direncini artır (takip edilecek bir değişken olarak eklenebilir)
+        // Hasar direncini artır
         float defenseBonus = 0.5f; // %50 daha az hasar
+        enemySettings.DamageReduction = defenseBonus; // Hasar azaltma değerini ayarla
         
         // 6 saniye süreyle defans duruşunda kal
         yield return new WaitForSeconds(6f);
         
         // Defans bonusunu kaldır
+        enemySettings.DamageReduction = 0f; // Normal hasar alımına dön
     }
     
     // Avcı: Tuzak kurma
